@@ -2,35 +2,35 @@
 let questions = [
     {
     numb: 1,
-    question: "What does social engineering mean?",
-    answer: "Using socially available mediums to reveal or identify specific information",
+    question: "Friday variya?",
+    answer: "Yes",
     options: [
-      "Engineering something for social benefit",
-      "Engineering with the community",
-      "Using socially available mediums to reveal or identify specific information",
-      "I don't know"
+      "Yes",
+      "Maybe Yes",
+      "No, but pakla",
+      "pakla"
     ]
   },
     {
     numb: 2,
-    question: "Best practice for password?",
-    answer: "Store it in the password manager only",
+    question: "Nee eppa taa free?",
+    answer: "This Friday",
     options: [
-      "Write it in a paper",
-      "Store it in the password manager only",
-      "Say it to friends",
-      "I don't know"
+      "This Friday",
+      "Maybe this Friday",
+      "Amma kitta keknu",
+      "Anytime 😏"
     ]
   },
     {
     numb: 3,
-    question: "What do you do when you get a suspicious email?",
-    answer: "Report it to the security team",
+    question: "Saptiya?",
+    answer: "Friday velila kondu po",
     options: [
-      "Report it to the security team",
-      "Don't inform anyone",
-      "Click on any urls inside the email",
-      "I don't know"
+      "Sapte",
+      "Inu illa",
+      "Friday velila kondu po",
+      "Amma seiyonum"
     ]
   },
 ];
