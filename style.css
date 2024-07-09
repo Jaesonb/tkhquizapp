@@ -47,7 +47,6 @@ body{
     border-radius: 5px;
     background: #fff;
     cursor: pointer;
-    width: 100%;
 }
 
 .start_btn button:hover{
@@ -56,7 +55,7 @@ body{
 }
 
 .info_box{
-    width: 90%;
+    width: 540px;
     background: #fff;
     border-radius: 5px;
     transform: translate(-50%, -50%) scale(0.9);
@@ -114,7 +113,7 @@ body{
 }
 
 .quiz_box{
-    width: 90%;
+    width: 550px;
     background: #fff;
     border-radius: 5px;
     transform: translate(-50%, -50%) scale(0.9);
