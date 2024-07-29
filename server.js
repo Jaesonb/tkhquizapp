@@ -1,3 +1,4 @@
+// Load environment variables
 require('dotenv').config();
 
 const express = require('express');
@@ -5,9 +6,15 @@ const bodyParser = require('body-parser');
 const pgp = require('pg-promise')();
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT;  // Use PORT from .env, default to 3000
 
-const db = pgp(`postgres://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+// Use DATABASE_URL from environment variables
+const db = pgp(process.env.DATABASE_URL);
+
+// const app = express();
+// const port = 3000;
+
+// const db = pgp(`postgres://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
