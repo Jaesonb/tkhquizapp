@@ -1,11 +1,13 @@
+require('dotenv').config();
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const pgp = require('pg-promise')();
 
 const app = express();
-const port = 5500;
+const port = 3000;
 
-const db = pgp('postgres://user:jhb77@localhost:5432/thekernelhub_login');
+const db = pgp(`postgres://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -32,5 +34,5 @@ app.post('/login', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server running at http://localhost:${5500}/`);
+    console.log(`Server running at http://localhost:${8080}/`);
 });
