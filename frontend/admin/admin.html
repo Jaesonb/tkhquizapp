@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center mt-5">Admin Dashboard</h2>
+        <div id="adminContent" class="mt-3">
+            <!-- Admin functionality here -->
+            <h3>All Users' Scores</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody id="userScores">
+                    <!-- Dynamic content -->
+                </tbody>
+            </table>
+            <h3>Add Questions</h3>
+            <form id="addQuestionForm">
+                <div class="form-group">
+                    <label for="question">Question:</label>
+                    <input type="text" class="form-control" id="question" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Question</button>
+            </form>
+        </div>
+    </div>
+    <script src="/backend/admin/admin.js"></script>
+</body>
+</html>

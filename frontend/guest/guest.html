@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest Dashboard</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center mt-5">Guest Dashboard</h2>
+        <div id="guestContent" class="mt-3">
+            <!-- Guest functionality here -->
+            <h3>Your Score</h3>
+            <p id="userScore">Score: <!-- Dynamic content --></p>
+            <h3>Questionnaire</h3>
+            <form id="questionnaireForm">
+                <!-- Dynamic questions -->
+            </form>
+            <button id="submitAnswers" class="btn btn-primary">Submit Answers</button>
+        </div>
+    </div>
+    <script src="/backend/guest/guest.js"></script>
+</body>
+</html>

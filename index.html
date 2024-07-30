@@ -32,28 +32,8 @@
         </form>
         <div id="message" class="mt-2"></div>
     </div>
-
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            fetch('/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password }),
-            })
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById('message').innerText = data;
-            })
-            .catch((error) => {
-                console.error('Error:', error);
-            });
-        });
-    </script>
+    <script src="/backend/login/login.js"></script>
+    <script src="/backend/guest/guest.js"></script>
+    <script src="/server.js"></script>
 </body>
 </html>
