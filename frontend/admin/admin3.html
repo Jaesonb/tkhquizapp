@@ -83,6 +83,7 @@
                             <a class="nav-link me-lg-3 mb-0" href="page2.html">Log Out</a>
                           </li>
                       </ul>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -91,38 +92,21 @@
 
             <main>
                 <h2 class="text-center mt-5">TheKernelHub Admin Dashboard</h2>
-                <div id="adminContent" class="mt-3">
-                    <div class="scores-container">
-                        <h2 class="my-3">User Scores</h2>
-                            <!-- Admin functionality here -->
-                            <!-- <h3>All Users' Scores</h3>
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Username</th>
-                                        <th>Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="userScores">
-                                    
-                                </tbody>
-                            </table> -->
-
-                            <table class="table" id="user-scores-table">
-                                <thead>
-                                    <tr>
-                                        <th>Username</th>
-                                        <th>Score</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                    </div>
-
-                    
+                <div class="container my-5">
+                    <h1 class="text-center">Submit a New Question</h1>
+                    <form id="faq-form">
+                        <div class="form-group">
+                            <label for="question" class="text-white">Question</label>
+                            <input type="text" id="question" name="question" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="answer" class="text-white">Answer</label>
+                            <input type="text" id="answer" name="answer" required>
+                        </div>
+                        <button type="submit">Submit Question and Answer</button>
+                    </form>
+                    <div id="response-message" class="response-message"></div>
                 </div>
-            </main>
-        </div>
 
         <!-- Footer -->
         <footer id = "footer" class="text-center my-3 py-3 ">
@@ -132,6 +116,7 @@
             </footer>
             <!-- End Footer -->
         <script src="/backend/admin/admin.js"></script>
+    </div>
     </div>
 </body>
 </html>

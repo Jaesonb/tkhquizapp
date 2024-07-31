@@ -27,3 +27,40 @@ SELECT * FROM pg_roles;
 UPDATE users
 SET password = 'jhb777'
 WHERE username = 'admin';
+
+-- Create questions table
+CREATE TABLE questions (
+    id SERIAL PRIMARY KEY,
+    question_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create answers table
+CREATE TABLE answers (
+    id SERIAL PRIMARY KEY,
+    question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+    answer_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- Insert sample data into questions
+INSERT INTO questions (question_text) VALUES ('What is the capital of France?');
+
+-- Insert sample data into answers
+INSERT INTO answers (question_id, answer_text) VALUES
+(1, 'Paris'),
+(1, 'Lyon'),
+(1, 'Marseille');
+
+Select * from questions; 
+
+Select * from answers; 
+
+UPDATE questions
+SET question_text = 'what is social engineering?'
+WHERE id = '1';
+
+UPDATE answers
+SET answer_text = 'I dont know'
+WHERE id = '3';
