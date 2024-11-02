@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        /* Basic tab styling */
+        .tabs { display: flex; cursor: pointer; }
+        .tab { padding: 10px 20px; margin-right: 5px; border: 1px solid #ddd; border-radius: 5px; }
+        .tab.active { background-color: #ddd; font-weight: bold; }
+        .tab-content { margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <h2>Add a New Question</h2>
+    <form action="/admin/questions" method="POST">
+        <label for="questionText">Question:</label>
+        <input type="text" name="questionText" required>
+    
+        <h3>Answers:</h3>
+        <div id="answerFields">
+            <div>
+                <input type="text" name="answers[0][text]" placeholder="Answer text" required>
+                <label>
+                    <input type="checkbox" name="answers[0][isCorrect]"> Correct Answer
+                </label>
+            </div>
+        </div>
+    
+        <button type="button" onclick="addAnswer()">Add Another Answer</button>
+        <button type="submit">Save Question</button>
+    </form>
+    
+    <script>
+        let answerCount = 1;
+    
+        function addAnswer() {
+            const answerFields = document.getElementById('answerFields');
+            const newAnswer = document.createElement('div');
+            newAnswer.innerHTML = `
+                <input type="text" name="answers[${answerCount}][text]" placeholder="Answer text" required>
+                <label>
+                    <input type="checkbox" name="answers[${answerCount}][isCorrect]"> Correct Answer
+                </label>
+            `;
+            answerFields.appendChild(newAnswer);
+            answerCount++;
+        }
+    </script>
+    
+</body>
+</html>

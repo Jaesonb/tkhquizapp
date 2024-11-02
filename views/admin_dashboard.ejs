@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        .tab {
+            display: inline-block;
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #ddd;
+            border: 1px solid #ccc;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            border-bottom: none;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            margin-top: -1px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin Dashboard</h1>
+
+    <!-- Logout link/button -->
+    <a href="/logout" style="float: right; text-decoration: none; padding: 10px; background-color: #f44336; color: white; border-radius: 5px;">Logout</a>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('userScores')">User Scores</div>
+        <div class="tab" onclick="showTab('createQuestion')">Create Questions</div>
+    </div>
+
+    <!-- Tab Contents -->
+    <div id="userScores" class="tab-content active">
+        <h2>User Scores</h2>
+        <%- include('admin_scores') %>
+    </div>
+
+    <div id="createQuestion" class="tab-content">
+        <h2>Create New Question</h2>
+        <%- include('admin_create_question') %>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+        }
+    </script>
+    
+</body>
+</html>

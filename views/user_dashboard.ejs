@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+</head>
+<body>
+    <h1>User Dashboard</h1>
+
+    <% if (hasTakenQuiz) { %>
+        <!-- Display the user's score and retake option -->
+        <h2>Your Score: <%= highestScore %></h2>
+        <p>Would you like to try again to improve your score?</p>
+        <form action="/reset-quiz" method="POST">
+            <button type="submit">Retake Quiz</button>
+        </form>
+    <% } else { %>
+        <!-- Display the quiz form -->
+        <h2>Take the Quiz</h2>
+        <form id="quiz-form" action="/submit-answers" method="POST">
+            <% Object.keys(questions).forEach(questionId => { %>
+                <fieldset>
+                    <legend><%= questions[questionId].question_text %></legend>
+                    <% questions[questionId].answers.forEach(answer => { %>
+                        <label>
+                            <input type="radio" name="answers[<%= questionId %>]" value="<%= answer.answer_id %>" required>
+                            <%= answer.answer_text %>
+                        </label><br>
+                    <% }) %>
+                </fieldset>
+            <% }) %>
+            <button type="submit">Submit Quiz</button>
+        </form>
+    <% } %>
+
+</body>
+</html>

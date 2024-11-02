@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        /* Basic tab styling */
+        .tabs { display: flex; cursor: pointer; }
+        .tab { padding: 10px 20px; margin-right: 5px; border: 1px solid #ddd; border-radius: 5px; }
+        .tab.active { background-color: #ddd; font-weight: bold; }
+        .tab-content { margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<h2>User Scores</h2>
+<table border="1" cellspacing="0" cellpadding="8">
+    <tr>
+        <th>Username</th>
+        <th>Highest Score</th>
+    </tr>
+    <% scores.forEach(score => { %>
+        <tr>
+            <td><%= score.username %></td>
+            <td><%= score.highest_score %></td>
+        </tr>
+    <% }) %>
+</table>
+</body>
+</html>
