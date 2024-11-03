@@ -86,6 +86,8 @@ ALTER TABLE user_answers
 ADD CONSTRAINT fk_selected_answer
 FOREIGN KEY (selected_answer) REFERENCES answers(answer_id);
 
+DELETE FROM user_answers;
+
 
 select * from users
 select * from questions

@@ -107,15 +107,23 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
 
     try {
-        // Check if user has taken the quiz and retrieve their score
-        const scoreResult = await db.query('SELECT highest_score FROM user_scores WHERE user_id = $1', [userId]);
+        // Check if the user has any answers recorded in `user_answers`
+        const answersResult = await db.query('SELECT * FROM user_answers WHERE user_id = $1', [userId]);
+        const hasAnswers = answersResult.rows.length > 0;
 
-        if (scoreResult.rows.length > 0) {
-            // User has taken the quiz, render page with their score
-            const highestScore = scoreResult.rows[0].highest_score;
-            res.render('user_dashboard', { hasTakenQuiz: true, highestScore });
+        let highestScore = 0;
+        let hasTakenQuiz = false;
+        let questions = {};
+
+        if (hasAnswers) {
+            // If the user has answers, fetch their highest score
+            const scoreResult = await db.query('SELECT highest_score FROM user_scores WHERE user_id = $1', [userId]);
+            if (scoreResult.rows.length > 0) {
+                highestScore = scoreResult.rows[0].highest_score;
+            }
+            hasTakenQuiz = true;
         } else {
-            // User hasn't taken the quiz, so retrieve questions for the quiz
+            // If the user has no answers, load the quiz questions
             const questionsResult = await db.query(`
                 SELECT q.question_id, q.question_text, a.answer_id, a.answer_text
                 FROM questions q
@@ -123,8 +131,6 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
                 ORDER BY q.question_id
             `);
 
-            // Organize questions and answers
-            const questions = {};
             questionsResult.rows.forEach(row => {
                 if (!questions[row.question_id]) {
                     questions[row.question_id] = {
@@ -137,15 +143,16 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
                     answer_text: row.answer_text
                 });
             });
-
-            // Render page with the quiz
-            res.render('user_dashboard', { hasTakenQuiz: false, questions });
         }
+
+        // Render user dashboard with quiz questions or score, as appropriate
+        res.render('user_dashboard', { hasTakenQuiz, highestScore, questions });
     } catch (err) {
         console.error("Error loading user dashboard:", err);
         res.status(500).send('Failed to load user dashboard');
     }
 });
+
 
 // Admin-only dashboard route with scores
 app.get('/admin', authenticateToken, ensureAdmin, async (req, res) => {
@@ -192,42 +199,43 @@ app.post('/admin/questions', authenticateToken, ensureAdmin, async (req, res) =>
 // Handle questionnaire submission and calculate score
 app.post('/submit-answers', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
-    const answers = req.body.answers;
+    let answers = req.body.answers;
 
     // Log the submitted answers for debugging
-    console.log("Submitted answers:", answers);
+    console.log("Original submitted answers:", answers);
 
-    if (!answers || typeof answers !== 'object') {
+    // Transform answers to an object if it arrives as an array
+    if (Array.isArray(answers)) {
+        answers = Object.fromEntries(answers.map((ans, index) => [index + 1, ans]));
+    }
+
+    console.log("Processed answers as object:", answers);
+
+    if (!answers || typeof answers !== 'object' || Object.keys(answers).length === 0) {
         console.error("Invalid answer submission:", answers);
         return res.status(400).send('Invalid answer submission');
     }
 
     try {
-        // Fetch valid question IDs from the database dynamically
         const validQuestionIdsResult = await db.query('SELECT question_id FROM questions');
         const validQuestionIds = validQuestionIdsResult.rows.map(row => row.question_id);
 
         let score = 0;
 
-        // Process each answer
         await Promise.all(Object.keys(answers).map(async (questionId) => {
             const parsedQuestionId = parseInt(questionId, 10);
 
-            // Validate that questionId exists in the validQuestionIds array
             if (!validQuestionIds.includes(parsedQuestionId)) {
                 console.error(`Invalid question ID submitted: ${parsedQuestionId}`);
                 throw new Error(`Invalid question ID: ${parsedQuestionId}`);
             }
 
-            const selectedAnswerId = answers[questionId];
-
-            // Ensure selectedAnswerId is defined
+            const selectedAnswerId = parseInt(answers[questionId], 10);
             if (!selectedAnswerId) {
                 console.error(`Answer ID not found for question ${questionId}`);
                 throw new Error(`Answer ID missing for question ${questionId}`);
             }
 
-            // Fetch the correctness of the selected answer
             const answerResult = await db.query('SELECT is_correct FROM answers WHERE answer_id = $1', [selectedAnswerId]);
             if (answerResult.rows.length === 0) {
                 console.error(`Answer with ID ${selectedAnswerId} does not exist in the database`);
@@ -237,24 +245,25 @@ app.post('/submit-answers', authenticateToken, async (req, res) => {
             const isCorrect = answerResult.rows[0].is_correct;
             if (isCorrect) score += 1;
 
-            // Save the answer in the user_answers table
             await db.query(
                 'INSERT INTO user_answers (user_id, question_id, selected_answer, is_correct) VALUES ($1, $2, $3, $4)',
                 [userId, parsedQuestionId, selectedAnswerId, isCorrect]
             );
         }));
 
-        // Retrieve existing highest score for comparison
+        // Retrieve the user's current highest score from user_scores
         const existingScore = await db.query('SELECT highest_score FROM user_scores WHERE user_id = $1', [userId]);
         const existingHighestScore = existingScore.rows[0]?.highest_score || 0;
 
-        // Update highest score if the new score is greater
+        // Update the highest score only if the new score is greater
         if (score > existingHighestScore) {
-            if (existingScore.rows.length > 0) {
-                await db.query('UPDATE user_scores SET highest_score = $1 WHERE user_id = $2', [score, userId]);
-            } else {
-                await db.query('INSERT INTO user_scores (user_id, highest_score) VALUES ($1, $2)', [userId, score]);
-            }
+            await db.query(`
+                INSERT INTO user_scores (user_id, highest_score)
+                VALUES ($1, $2)
+                ON CONFLICT (user_id)
+                DO UPDATE SET highest_score = $2
+                WHERE user_scores.highest_score < $2;
+            `, [userId, score]);
         }
 
         res.redirect('/user-dashboard');
@@ -272,12 +281,15 @@ app.post('/reset-quiz', authenticateToken, async (req, res) => {
     try {
         // Delete previous answers if the user wants to retake the quiz
         await db.query('DELETE FROM user_answers WHERE user_id = $1', [userId]);
-        res.redirect('/user-dashboard');
+
+        // Redirect to the quiz-taking route
+        res.redirect('/user-dashboard'); // Ensure /user-dashboard displays the quiz if no answers are found
     } catch (err) {
         console.error("Error resetting quiz:", err);
         res.status(500).send('Failed to reset quiz');
     }
 });
+
 
 // Logout route
 app.get('/logout', (req, res) => {

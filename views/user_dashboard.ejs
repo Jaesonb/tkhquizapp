@@ -8,6 +8,9 @@
 <body>
     <h1>User Dashboard</h1>
 
+    <!-- Logout link/button -->
+    <a href="/logout" style="float: right; text-decoration: none; padding: 10px; background-color: #f44336; color: white; border-radius: 5px;">Logout</a>
+
     <% if (hasTakenQuiz) { %>
         <!-- Display the user's score and retake option -->
         <h2>Your Score: <%= highestScore %></h2>
@@ -20,7 +23,6 @@
         <h2>Take the Quiz</h2>
         <form id="quiz-form" action="/submit-answers" method="POST">
             <% Object.keys(questions).forEach(questionId => { %>
-                <!-- Display questionId for debugging -->
                 <p>Question ID: <%= questionId %></p>
                 <fieldset>
                     <legend><%= questions[questionId].question_text %></legend>
@@ -31,6 +33,7 @@
                         </label><br>
                     <% }) %>
                 </fieldset>
+               
             <% }) %>
             <button type="submit">Submit Quiz</button>
         </form>
