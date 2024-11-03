@@ -20,6 +20,8 @@
         <h2>Take the Quiz</h2>
         <form id="quiz-form" action="/submit-answers" method="POST">
             <% Object.keys(questions).forEach(questionId => { %>
+                <!-- Display questionId for debugging -->
+                <p>Question ID: <%= questionId %></p>
                 <fieldset>
                     <legend><%= questions[questionId].question_text %></legend>
                     <% questions[questionId].answers.forEach(answer => { %>
@@ -33,6 +35,10 @@
             <button type="submit">Submit Quiz</button>
         </form>
     <% } %>
-
+    <script>
+        console.log("Rendered questions data:", <%= JSON.stringify(questions) %>);
+    </script>
+    <script src="/public/js/questionnaire.js"></script>
+    
 </body>
 </html>

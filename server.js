@@ -265,8 +265,6 @@ app.post('/submit-answers', authenticateToken, async (req, res) => {
 });
 
 
-
-
 // Route to reset quiz for retake
 app.post('/reset-quiz', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
