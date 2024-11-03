@@ -88,6 +88,12 @@ FOREIGN KEY (selected_answer) REFERENCES answers(answer_id);
 
 DELETE FROM user_answers;
 
+DELETE FROM questions;
+
+DELETE FROM user_scores;
+
+DELETE FROM users;
+
 
 select * from users
 select * from questions
