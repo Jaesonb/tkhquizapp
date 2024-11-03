@@ -1,8 +1,31 @@
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
+body,html {
     margin: 0;
-    padding: 20px;
+    padding: 0;
+    /* padding-top: 20px; */
+    font-family: 'League Spartan', sans-serif;
+    color: white;
+    overflow: auto; /* Hide scrollbars */
+  
+  }  
+
+
+  #main-content {
+    overflow: auto; /* Restore scrollbars for the main content */
+    position: relative;  /* Ensures content remains above the video */
+    z-index: 1;  /* This isn't always necessary but helps ensure the content is on top */
+  }
+
+  #video-background1 {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    opacity: 1;
+    z-index: -1;  /* Updated to a smaller negative value */
+    pointer-events: none;
+    background-color: black;  /* Fallback color in case the video fails to load */
 }
 
 h1 {
