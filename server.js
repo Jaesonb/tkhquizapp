@@ -161,6 +161,7 @@ app.get('/admin', authenticateToken, ensureAdmin, async (req, res) => {
             SELECT u.username, COALESCE(us.highest_score, 0) AS highest_score
             FROM users u
             LEFT JOIN user_scores us ON u.user_id = us.user_id
+            WHERE u.is_admin = FALSE
             ORDER BY u.username
         `);
         res.render('admin_dashboard', { scores: result.rows });
