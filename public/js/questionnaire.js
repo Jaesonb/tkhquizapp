@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // Optional: Enhance the radio button labels to highlight the selected answer
+    // Enhance the radio button labels to highlight the selected answer
     document.querySelectorAll("input[type='radio']").forEach((radio) => {
         radio.addEventListener("change", function () {
             // Remove highlight from other options in the same question

@@ -12,7 +12,7 @@ body,html {
   #main-content {
     overflow: auto; /* Restore scrollbars for the main content */
     position: relative;  /* Ensures content remains above the video */
-    z-index: 1;  /* This isn't always necessary but helps ensure the content is on top */
+    z-index: 1;  
   }
 
   #video-background1 {
@@ -23,7 +23,7 @@ body,html {
     height: 100vh;
     object-fit: cover;
     opacity: 1;
-    z-index: -1;  /* Updated to a smaller negative value */
+    z-index: -1;  
     pointer-events: none;
     background-color: black;  /* Fallback color in case the video fails to load */
 }
