@@ -86,6 +86,19 @@ ALTER TABLE user_answers
 ADD CONSTRAINT fk_selected_answer
 FOREIGN KEY (selected_answer) REFERENCES answers(answer_id);
 
+--FOREIGN KEY with ON DELETE CASCADE to answers(answer_id):
+ALTER TABLE user_answers
+DROP CONSTRAINT fk_selected_answer;
+
+ALTER TABLE user_answers
+ADD CONSTRAINT fk_selected_answer
+FOREIGN KEY (selected_answer) REFERENCES answers(answer_id) ON DELETE CASCADE;
+
+SELECT answer_id, answer_text, question_id
+FROM answers
+ORDER BY answer_id;
+
+
 DELETE FROM user_answers;
 
 DELETE FROM questions;

@@ -35,3 +35,21 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
+
+document.addEventListener("DOMContentLoaded", function () {
+    const totalQuestions = document.querySelectorAll("fieldset.question").length;
+    const progressBar = document.getElementById("progress-bar");
+
+    function updateProgress() {
+        const answered = document.querySelectorAll("fieldset.question input[type='radio']:checked").length;
+        const percent = (answered / totalQuestions) * 100;
+        progressBar.style.width = percent + '%';
+        progressBar.innerText = `${Math.round(percent)}% Completed`;
+    }
+
+    document.querySelectorAll("input[type='radio']").forEach((radio) => {
+        radio.addEventListener("change", updateProgress);
+    });
+
+    updateProgress(); // Initial update
+});
