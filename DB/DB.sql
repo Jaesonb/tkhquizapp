@@ -115,6 +115,14 @@ ALTER SEQUENCE answers_answer_id_seq RESTART WITH 1;
 
 ALTER SEQUENCE user_scores_score_id_seq RESTART WITH 1;
 
+SELECT *
+FROM users
+WHERE username = 'user8';
+
+SELECT *
+FROM questions
+WHERE question_text = 'testq1';
+
 
 select * from users
 select * from questions
