@@ -18,6 +18,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// server.js
+const RSSParser = require('rss-parser');
+const parser = new RSSParser();
+// … existing requires …
+
+
 // Session
 app.use(session({
     secret: process.env.SESSION_SECRET,
@@ -79,36 +85,43 @@ app.post('/login', async (req, res) => {
 
 app.get('/user-dashboard', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
+  let newsItems = [];
 
   try {
-    // did they answer anything?
-    const taken = await db.query(
-      'SELECT 1 FROM user_answers WHERE user_id=$1 LIMIT 1',
+    // 1) Lookup the username for greeting
+    const { rows: userRows } = await db.query(
+      'SELECT username FROM users WHERE user_id = $1',
       [userId]
     );
-    const hasTakenQuiz = taken.rowCount > 0;
+    const username = userRows[0]?.username || 'User';
+
+    // 2) Have they taken the quiz?
+    const { rowCount } = await db.query(
+      'SELECT 1 FROM user_answers WHERE user_id = $1 LIMIT 1',
+      [userId]
+    );
+    const hasTakenQuiz = rowCount > 0;
 
     if (hasTakenQuiz) {
-      // load high score
+      // 3a) Load their highest score
       const { rows: sr } = await db.query(
-        'SELECT highest_score FROM user_scores WHERE user_id=$1',
+        'SELECT highest_score FROM user_scores WHERE user_id = $1',
         [userId]
       );
       const highestScore = sr[0]?.highest_score || 0;
 
-      // load each question’s selected + correct answer
+      // 3b) Load their detailed answers vs correct answers
       const { rows: detail } = await db.query(`
         SELECT
           q.question_text,
-          sa.answer_text  AS selected_answer_text,
-          sa.is_correct   AS is_selected_correct,
-          ca.answer_text  AS correct_answer_text
+          sa.answer_text   AS selected_answer_text,
+          sa.is_correct    AS is_selected_correct,
+          ca.answer_text   AS correct_answer_text
         FROM user_answers ua
         JOIN questions q ON q.question_id = ua.question_id
-        JOIN answers sa ON sa.answer_id = ua.selected_answer
-        JOIN answers ca
-          ON ca.question_id = q.question_id
-         AND ca.is_correct = true
+        JOIN answers sa   ON sa.answer_id   = ua.selected_answer
+        JOIN answers ca   ON ca.question_id = q.question_id
+                           AND ca.is_correct = true
         WHERE ua.user_id = $1
         ORDER BY q.question_id
       `, [userId]);
@@ -120,14 +133,29 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
         is_correct:      r.is_selected_correct
       }));
 
+      // 3c) Fetch latest cybersecurity news
+      try {
+        const feed = await parser.parseURL('https://www.darkreading.com/rss.xml');
+        newsItems = feed.items.slice(0, 5).map(item => ({
+          title:   item.title,
+          link:    item.link,
+          pubDate: item.pubDate
+        }));
+      } catch (rssErr) {
+        console.error('⚠️ Failed to fetch RSS feed:', rssErr);
+      }
+
+      // 3d) Render results view
       return res.render('user_dashboard', {
+        username,
         hasTakenQuiz,
         highestScore,
-        correctAnswers
+        correctAnswers,
+        newsItems
       });
     }
 
-    // otherwise, pull fresh quiz
+    // 4) Otherwise, build a fresh shuffled quiz
     const { rows: qr } = await db.query(`
       SELECT
         q.question_id, q.question_text,
@@ -139,7 +167,12 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
 
     const questions = {};
     qr.forEach(r => {
-      questions[r.question_id] ??= { question_text: r.question_text, answers: [] };
+      if (!questions[r.question_id]) {
+        questions[r.question_id] = {
+          question_text: r.question_text,
+          answers:       []
+        };
+      }
       questions[r.question_id].answers.push({
         answer_id:   r.answer_id,
         answer_text: r.answer_text,
@@ -147,12 +180,28 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
       });
     });
 
+    // 5) Fetch news even for first-time users
+    try {
+      const feed = await parser.parseURL('https://www.darkreading.com/rss.xml');
+      newsItems = feed.items.slice(0, 5).map(item => ({
+        title:   item.title,
+        link:    item.link,
+        pubDate: item.pubDate
+      }));
+    } catch (rssErr) {
+      console.error('⚠️ Failed to fetch RSS feed:', rssErr);
+    }
+
+    // 6) Render quiz view
     return res.render('user_dashboard', {
-      hasTakenQuiz:    false,
-      highestScore:    0,
+      username,
+      hasTakenQuiz:   false,
+      highestScore:   0,
       questions,
-      correctAnswers:  []
+      correctAnswers: [],
+      newsItems
     });
+
   } catch (err) {
     console.error('Error in /user-dashboard route:', err);
     return res.status(500).send('Failed to load user dashboard');
@@ -233,28 +282,152 @@ app.post('/reset-quiz', authenticateToken, async (req, res) => {
 });
 
 app.get('/admin', authenticateToken, ensureAdmin, async (req, res) => {
-    try {
-        const result = await db.query(`
-            SELECT u.username, COALESCE(us.highest_score, 0) AS highest_score
-            FROM users u
-            LEFT JOIN user_scores us ON u.user_id = us.user_id
-            WHERE u.is_admin = FALSE
-            ORDER BY u.username
-        `);
+  try {
+    // Fetch summary scores
+    const scoresRes = await db.query(`
+      SELECT u.username, COALESCE(us.highest_score, 0) AS highest_score
+      FROM users u
+      LEFT JOIN user_scores us ON u.user_id = us.user_id
+      WHERE u.is_admin = FALSE
+      ORDER BY u.username
+    `);
 
-        const questions = await db.query(`
-            SELECT q.question_id, q.question_text, 
-                   json_agg(json_build_object('answer_id', a.answer_id, 'answer_text', a.answer_text, 'is_correct', a.is_correct)) AS answers
-            FROM questions q
-            JOIN answers a ON q.question_id = a.question_id
-            GROUP BY q.question_id
-        `);
+    // Fetch questions (for the Create tab)
+    const questionsRes = await db.query(`
+      SELECT q.question_id,
+             q.question_text,
+             json_agg(
+               json_build_object(
+                 'answer_id',   a.answer_id,
+                 'answer_text', a.answer_text,
+                 'is_correct',  a.is_correct
+               )
+             ) AS answers
+      FROM questions q
+      JOIN answers a ON a.question_id = q.question_id
+      GROUP BY q.question_id
+    `);
 
-        res.render('admin_dashboard', { scores: result.rows, questions: questions.rows });
-    } catch (err) {
-        res.status(500).send('Failed to load admin dashboard');
-    }
+    // Fetch detailed user‐by‐question results for the new tab
+    const resultsRes = await db.query(`
+      SELECT
+        u.username,
+        q.question_text,
+        sa.answer_text   AS selected_answer,
+        ca.answer_text   AS correct_answer,
+        ua.is_correct,
+        ua.created_at
+      FROM user_answers ua
+      JOIN users    u ON u.user_id      = ua.user_id
+      JOIN questions q ON q.question_id = ua.question_id
+      JOIN answers  sa ON sa.answer_id   = ua.selected_answer
+      JOIN answers  ca ON ca.question_id = q.question_id
+                       AND ca.is_correct = true
+      ORDER BY u.username, ua.created_at, q.question_id
+    `);
+
+    // 4) Render and pass **all three** datasets
+    res.render('admin_dashboard', {
+      scores:    scoresRes.rows,
+      questions: questionsRes.rows,
+      results:   resultsRes.rows
+    });
+  } catch (err) {
+    console.error('Error loading admin dashboard:', err);
+    res.status(500).send('Failed to load admin dashboard');
+  }
 });
+
+
+// Allow auditors to download scores as CSV
+app.get('/admin/download-scores', authenticateToken, ensureAdmin, async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT u.username,
+             COALESCE(us.highest_score, 0) AS highest_score
+      FROM users u
+      LEFT JOIN user_scores us ON u.user_id = us.user_id
+      WHERE u.is_admin = FALSE
+      ORDER BY u.username
+    `);
+
+    res.setHeader('Content-Disposition', 'attachment; filename="user_scores.csv"');
+    res.setHeader('Content-Type', 'text/csv');
+
+    // build CSV
+    const header = 'Username,Highest Score\n';
+    const csv = rows.map(r => `${r.username},${r.highest_score}`).join('\n');
+    res.send(header + csv);
+
+  } catch (err) {
+    console.error('Error generating CSV:', err);
+    res.status(500).send('Failed to generate CSV');
+  }
+});
+
+
+// 1a) Render the detailed user-results page
+app.get('/admin/user-results', authenticateToken, ensureAdmin, async (req, res) => {
+  try {
+    const { rows: results } = await db.query(`
+      SELECT
+        u.username,
+        q.question_text,
+        sa.answer_text   AS selected_answer,
+        ca.answer_text   AS correct_answer,
+        ua.is_correct,
+        ua.created_at
+      FROM user_answers ua
+      JOIN users    u ON u.user_id      = ua.user_id
+      JOIN questions q ON q.question_id = ua.question_id
+      JOIN answers  sa ON sa.answer_id   = ua.selected_answer
+      JOIN answers  ca ON ca.question_id = q.question_id
+                       AND ca.is_correct = true
+      ORDER BY u.username, ua.created_at, q.question_id
+    `);
+    res.render('admin_user_results', { results });
+  } catch (err) {
+    console.error('Error loading user results:', err);
+    res.status(500).send('Failed to load user results');
+  }
+});
+
+// 1b) CSV download of detailed results
+app.get('/admin/download-results', authenticateToken, ensureAdmin, async (req, res) => {
+  try {
+    const { rows: results } = await db.query(`
+      SELECT
+        u.username,
+        q.question_text,
+        sa.answer_text   AS selected_answer,
+        ca.answer_text   AS correct_answer,
+        ua.is_correct,
+        ua.created_at
+      FROM user_answers ua
+      JOIN users    u ON u.user_id      = ua.user_id
+      JOIN questions q ON q.question_id = ua.question_id
+      JOIN answers  sa ON sa.answer_id   = ua.selected_answer
+      JOIN answers  ca ON ca.question_id = q.question_id
+                       AND ca.is_correct = true
+      ORDER BY u.username, ua.created_at, q.question_id
+    `);
+
+    res.setHeader('Content-Disposition', 'attachment; filename="user_detailed_results.csv"');
+    res.setHeader('Content-Type', 'text/csv');
+
+    const header = 'Username,Question,Selected Answer,Correct Answer,Is Correct,Timestamp\n';
+    const csv = results.map(r =>
+      `"${r.username.replace(/"/g,'""')}","${r.question_text.replace(/"/g,'""')}","${r.selected_answer.replace(/"/g,'""')}","${r.correct_answer.replace(/"/g,'""')}",${r.is_correct},"${r.created_at.toISOString()}"`
+    ).join('\n');
+
+    res.send(header + csv);
+  } catch (err) {
+    console.error(' Error generating detailed CSV:', err);
+    res.status(500).send('Failed to generate CSV');
+  }
+});
+
+
 
 app.post('/admin/questions', authenticateToken, ensureAdmin, async (req, res) => {
     const { questionText, answers } = req.body;
@@ -309,48 +482,48 @@ app.post('/admin/questions/:id/delete', authenticateToken, ensureAdmin, async (r
 });
 
 app.post('/admin/questions/:id/edit', authenticateToken, ensureAdmin, async (req, res) => {
-    const questionId = req.params.id;
-    const { questionText, answers } = req.body;
+  const questionId = parseInt(req.params.id, 10);
+  const { questionText, answers } = req.body;
 
-    try {
-        // Step 1: Fetch all answer_ids for this question
-        const existingAnswers = await db.query(
-            'SELECT answer_id FROM answers WHERE question_id = $1',
-            [questionId]
+  try {
+    // 1) Update the question text
+    await db.query(
+      'UPDATE questions SET question_text = $1 WHERE question_id = $2',
+      [questionText, questionId]
+    );
+
+    // 2) Loop over each submitted answer
+    //    If it has an id, UPDATE; otherwise INSERT as new
+    for (let ans of answers) {
+      const isCorrect = ans.isCorrect === 'on';
+      if (ans.id) {
+        // existing answer → update it
+        await db.query(
+          `UPDATE answers
+              SET answer_text = $1,
+                  is_correct  = $2
+            WHERE answer_id = $3`,
+          [ans.text, isCorrect, parseInt(ans.id, 10)]
         );
-        const answerIds = existingAnswers.rows.map(row => row.answer_id);
-
-        if (answerIds.length > 0) {
-            // Step 2: Delete user_answers that refer to those answers
-            await db.query(
-                'DELETE FROM user_answers WHERE selected_answer = ANY($1)',
-                [answerIds]
-            );
-        }
-
-        // Step 3: Now safe to delete answers
-        await db.query('DELETE FROM answers WHERE question_id = $1', [questionId]);
-
-        // Step 4: Update question text
-        await db.query('UPDATE questions SET question_text = $1 WHERE question_id = $2', [questionText, questionId]);
-
-        // Step 5: Insert new answers
-        for (const key in answers) {
-            const answer = answers[key];
-            const answerText = answer.text;
-            const isCorrect = answer.isCorrect === 'on' || answer.isCorrect === true;
-            await db.query(
-                'INSERT INTO answers (question_id, answer_text, is_correct) VALUES ($1, $2, $3)',
-                [questionId, answerText, isCorrect]
-            );
-        }
-
-        res.redirect('/admin');
-    } catch (err) {
-        console.error('❌ Failed to update question:', err);
-        res.status(500).send('Failed to update question');
+      } else {
+        // brand new answer → insert
+        await db.query(
+          `INSERT INTO answers
+              (question_id, answer_text, is_correct)
+            VALUES ($1, $2, $3)`,
+          [questionId, ans.text, isCorrect]
+        );
+      }
     }
+
+    // 3) Redirect back
+    res.redirect('/admin');
+  } catch (err) {
+    console.error('Failed to update question:', err);
+    res.status(500).send('Failed to update question');
+  }
 });
+
 
 app.get('/logout', (req, res) => {
     req.session.destroy((err) => {

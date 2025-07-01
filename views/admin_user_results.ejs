@@ -27,37 +27,46 @@
 <body class="bg-light">
 
     <!-- Main Container -->
-    <div class="container mt-5">
-        <!-- Page Heading -->
-        <h2 class="text-center text-primary mb-4">User's Highest Scores</h2>
-
-        <!-- Page Heading & CSV Export -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <a href="/admin/download-scores" class="btn btn-success">
-            <i class="bi bi-download"></i> Export CSV
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>User Detailed Results of Last Attempt</h2>
+            <a href="/admin/download-results" class="btn btn-success">
+            <i class="bi bi-download"></i> Export Detailed CSV
             </a>
         </div>
 
-        <!-- User Scores Table -->
         <div class="table-responsive">
-            <table class="table table-bordered table-hover">
-                <thead class="table-primary">
-                    <tr>
-                        <th scope="col">Username</th>
-                        <th scope="col">Highest Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% scores.forEach(score => { %>
-                        <tr>
-                            <td><%= score.username %></td>
-                            <td><%= score.highest_score %></td>
-                        </tr>
-                    <% }) %>
-                </tbody>
+            <table class="table table-striped table-bordered">
+            <thead class="table-primary">
+                <tr>
+                <th>Username</th>
+                <th>Question</th>
+                <th>User's Answer</th>
+                <th>Correct Answer</th>
+                <th>Status</th>
+                <th>Attempted At</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% results.forEach(r => { %>
+                <tr>
+                    <td><%= r.username %></td>
+                    <td><%= r.question_text %></td>
+                    <td><%= r.selected_answer %></td>
+                    <td><%= r.correct_answer %></td>
+                    <td>
+                    <span class="badge <%= r.is_correct ? 'bg-success' : 'bg-danger' %>">
+                        <%= r.is_correct ? 'Correct' : 'Wrong' %>
+                    </span>
+                    </td>
+                    <td><%= new Date(r.created_at).toLocaleString() %></td>
+                </tr>
+                <% }) %>
+            </tbody>
             </table>
         </div>
-    </div>
+        </div>
+
 
     <!-- Bootstrap JavaScript Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>

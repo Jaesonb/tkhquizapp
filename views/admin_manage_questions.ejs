@@ -78,6 +78,10 @@
                             </div>
                             <% q.answers.forEach((a, i) => { %>
                             <div class="mb-2">
+
+                                <!-- preserve existing answer_id -->
+                                <input type="hidden" name="answers[<%= i %>][id]" value="<%= a.answer_id %>">
+
                                 <label>Answer <%= i + 1 %></label>
                                 <input type="text" class="form-control" name="answers[<%= i %>][text]" value="<%= a.answer_text %>" required>
                                 <div class="form-check">

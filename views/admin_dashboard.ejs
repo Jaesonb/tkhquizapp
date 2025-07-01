@@ -43,6 +43,9 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="userResults-tab" data-bs-toggle="tab" data-bs-target="#userResults" type="button" role="tab">User Results</button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="createQuestion-tab" data-bs-toggle="tab" data-bs-target="#createQuestion" type="button" role="tab" aria-controls="createQuestion" aria-selected="false">
                     Create Questions
                 </button>
@@ -59,6 +62,10 @@
             <!-- User Scores Tab -->
             <div class="tab-pane fade show active text-black" id="userScores" role="tabpanel" aria-labelledby="userScores-tab">
                 <%- include('admin_scores') %>
+            </div>
+
+            <div class="tab-pane fade text-black" id="userResults" role="tabpanel" aria-labelledby="userResults-tab">
+                <%- include('admin_user_results') %>
             </div>
 
             <!-- Create Questions Tab -->
