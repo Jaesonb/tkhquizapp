@@ -1,5 +1,5 @@
-require('dotenv').config(); // Load environment variables from .env file
-
+// server.js
+require('dotenv').config();
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -14,18 +14,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Set the view engine to EJS
+// View engine setup
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views')); // Explicitly set views directory
+app.set('views', path.join(__dirname, 'views'));
 
-// Session setup
+// Session
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false
 }));
 
-// JWT-based authentication middleware
+// Auth middleware
 const authenticateToken = (req, res, next) => {
     const token = req.session.token;
     if (!token) return res.redirect('/login');
@@ -36,125 +36,202 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// Middleware to ensure the user is an admin
 const ensureAdmin = (req, res, next) => {
-    if (!req.user || !req.user.isAdmin) {
-        return res.status(403).send('Access denied');
-    }
+    if (!req.user || !req.user.isAdmin) return res.status(403).send('Access denied');
     next();
 };
 
-// Root route: redirect to /login or render a welcome page
+// Routes
 app.get('/', (req, res) => res.redirect('/login'));
-
-// GET route for login page
 app.get('/login', (req, res) => res.render('login'));
-
-// GET route for registration page
 app.get('/register', (req, res) => res.render('register'));
 
-// Register a new user
 app.post('/register', async (req, res) => {
     const { username, password, isAdmin } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const is_admin = isAdmin || false;
-
     try {
-        await db.query('INSERT INTO users (username, password, is_admin) VALUES ($1, $2, $3)', [username, hashedPassword, is_admin]);
+        await db.query('INSERT INTO users (username, password, is_admin) VALUES ($1, $2, $3)', [username, hashedPassword, isAdmin || false]);
         res.redirect('/login');
     } catch (err) {
-        if (err.code === '23505') { // Postgres unique violation error code for duplicate usernames
-            res.status(400).send('Username already exists');
-        } else {
-            res.status(500).send('User registration failed');
-        }
+        if (err.code === '23505') return res.status(400).send('Username already exists');
+        res.status(500).send('User registration failed');
     }
 });
 
-// Login route
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
     try {
         const user = await db.query('SELECT * FROM users WHERE username = $1', [username]);
-
         if (user.rows.length && await bcrypt.compare(password, user.rows[0].password)) {
-            const isAdmin = user.rows[0].is_admin;
-
-            // Generate a JWT token and store it in the session
             const token = jwt.sign(
-                { userId: user.rows[0].user_id, isAdmin: isAdmin },
+                { userId: user.rows[0].user_id, isAdmin: user.rows[0].is_admin },
                 process.env.JWT_SECRET || 'your_jwt_secret'
             );
             req.session.token = token;
-
-            // Redirect based on user role
-            if (isAdmin) {
-                res.redirect('/admin');
-            } else {
-                res.redirect('/user-dashboard');
-            }
+            res.redirect(user.rows[0].is_admin ? '/admin' : '/user-dashboard');
         } else {
             res.status(401).send('Invalid credentials');
         }
     } catch (err) {
-        console.error("Login error:", err);
         res.status(500).send('Login failed');
     }
 });
 
-// User dashboard to display either score or quiz based on quiz completion
 app.get('/user-dashboard', authenticateToken, async (req, res) => {
-    const userId = req.user.userId;
+  const userId = req.user.userId;
 
-    try {
-        // Check if the user has any answers recorded in `user_answers`
-        const answersResult = await db.query('SELECT * FROM user_answers WHERE user_id = $1', [userId]);
-        const hasAnswers = answersResult.rows.length > 0;
+  try {
+    // did they answer anything?
+    const taken = await db.query(
+      'SELECT 1 FROM user_answers WHERE user_id=$1 LIMIT 1',
+      [userId]
+    );
+    const hasTakenQuiz = taken.rowCount > 0;
 
-        let highestScore = 0;
-        let hasTakenQuiz = false;
-        let questions = {};
+    if (hasTakenQuiz) {
+      // load high score
+      const { rows: sr } = await db.query(
+        'SELECT highest_score FROM user_scores WHERE user_id=$1',
+        [userId]
+      );
+      const highestScore = sr[0]?.highest_score || 0;
 
-        if (hasAnswers) {
-            // If the user has answers, fetch their highest score
-            const scoreResult = await db.query('SELECT highest_score FROM user_scores WHERE user_id = $1', [userId]);
-            if (scoreResult.rows.length > 0) {
-                highestScore = scoreResult.rows[0].highest_score;
-            }
-            hasTakenQuiz = true;
-        } else {
-            // If the user has no answers, load the quiz questions
-            const questionsResult = await db.query(`
-                SELECT q.question_id, q.question_text, a.answer_id, a.answer_text
-                FROM questions q
-                JOIN answers a ON q.question_id = a.question_id
-                ORDER BY q.question_id
-            `);
+      // load each question’s selected + correct answer
+      const { rows: detail } = await db.query(`
+        SELECT
+          q.question_text,
+          sa.answer_text  AS selected_answer_text,
+          sa.is_correct   AS is_selected_correct,
+          ca.answer_text  AS correct_answer_text
+        FROM user_answers ua
+        JOIN questions q ON q.question_id = ua.question_id
+        JOIN answers sa ON sa.answer_id = ua.selected_answer
+        JOIN answers ca
+          ON ca.question_id = q.question_id
+         AND ca.is_correct = true
+        WHERE ua.user_id = $1
+        ORDER BY q.question_id
+      `, [userId]);
 
-            questionsResult.rows.forEach(row => {
-                if (!questions[row.question_id]) {
-                    questions[row.question_id] = {
-                        question_text: row.question_text,
-                        answers: []
-                    };
-                }
-                questions[row.question_id].answers.push({
-                    answer_id: row.answer_id,
-                    answer_text: row.answer_text
-                });
-            });
-        }
+      const correctAnswers = detail.map(r => ({
+        question:        r.question_text,
+        selected_answer: r.selected_answer_text,
+        correct_answer:  r.correct_answer_text,
+        is_correct:      r.is_selected_correct
+      }));
 
-        // Render user dashboard with quiz questions or score, as appropriate
-        res.render('user_dashboard', { hasTakenQuiz, highestScore, questions });
-    } catch (err) {
-        console.error("Error loading user dashboard:", err);
-        res.status(500).send('Failed to load user dashboard');
+      return res.render('user_dashboard', {
+        hasTakenQuiz,
+        highestScore,
+        correctAnswers
+      });
     }
+
+    // otherwise, pull fresh quiz
+    const { rows: qr } = await db.query(`
+      SELECT
+        q.question_id, q.question_text,
+        a.answer_id,   a.answer_text, a.is_correct
+      FROM questions q
+      JOIN answers   a ON a.question_id = q.question_id
+      ORDER BY RANDOM()
+    `);
+
+    const questions = {};
+    qr.forEach(r => {
+      questions[r.question_id] ??= { question_text: r.question_text, answers: [] };
+      questions[r.question_id].answers.push({
+        answer_id:   r.answer_id,
+        answer_text: r.answer_text,
+        is_correct:  r.is_correct
+      });
+    });
+
+    return res.render('user_dashboard', {
+      hasTakenQuiz:    false,
+      highestScore:    0,
+      questions,
+      correctAnswers:  []
+    });
+  } catch (err) {
+    console.error('Error in /user-dashboard route:', err);
+    return res.status(500).send('Failed to load user dashboard');
+  }
 });
 
 
-// Admin-only dashboard route with scores
+app.post('/submit-answers', authenticateToken, async (req, res) => {
+  const userId      = req.user.userId;
+  let { answers, questionIds } = req.body;  
+  // Fallback: if answers came in as an array, rebuild the mapping
+  if (Array.isArray(answers) && Array.isArray(questionIds)) {
+    const rebuilt = {};
+    answers.forEach((ans, i) => {
+      rebuilt[ questionIds[i] ] = ans;
+    });
+    answers = rebuilt;
+  }
+
+  console.log(' Parsed answers:', answers);
+  if (!answers || Object.keys(answers).length === 0) {
+    return res.status(400).send('No answers submitted');
+  }
+
+  try {
+    // fetch valid question IDs
+    const { rows: validQs } = await db.query('SELECT question_id FROM questions');
+    const validIds = new Set(validQs.map(r => r.question_id));
+
+    let score = 0;
+    for (const [qid, aid] of Object.entries(answers)) {
+      const qn = parseInt(qid, 10);
+      const an = parseInt(aid, 10);
+      if (!validIds.has(qn)) continue;
+
+      // check correctness
+      const { rows } = await db.query(
+        'SELECT is_correct FROM answers WHERE answer_id=$1 AND question_id=$2',
+        [an, qn]
+      );
+      if (!rows.length) continue;
+      const correct = rows[0].is_correct;
+      if (correct) score++;
+
+      // insert
+      await db.query(
+        `INSERT INTO user_answers
+           (user_id, question_id, selected_answer, is_correct)
+         VALUES ($1,$2,$3,$4)`,
+        [userId, qn, an, correct]
+      );
+    }
+
+    // update high score
+    await db.query(`
+      INSERT INTO user_scores (user_id, highest_score)
+           VALUES ($1,$2)
+      ON CONFLICT (user_id) DO UPDATE
+        SET highest_score = EXCLUDED.highest_score
+      WHERE user_scores.highest_score < EXCLUDED.highest_score
+    `, [userId, score]);
+
+    return res.redirect('/user-dashboard');
+  } catch (err) {
+    console.error(' Error submitting answers:', err);
+    return res.status(500).send('Error submitting answers');
+  }
+});
+
+app.post('/reset-quiz', authenticateToken, async (req, res) => {
+    const userId = req.user.userId;
+    try {
+        await db.query('DELETE FROM user_answers WHERE user_id = $1', [userId]);
+        res.redirect('/user-dashboard');
+    } catch (err) {
+        res.status(500).send('Failed to reset quiz');
+    }
+});
+
 app.get('/admin', authenticateToken, ensureAdmin, async (req, res) => {
     try {
         const result = await db.query(`
@@ -164,146 +241,124 @@ app.get('/admin', authenticateToken, ensureAdmin, async (req, res) => {
             WHERE u.is_admin = FALSE
             ORDER BY u.username
         `);
-        res.render('admin_dashboard', { scores: result.rows });
+
+        const questions = await db.query(`
+            SELECT q.question_id, q.question_text, 
+                   json_agg(json_build_object('answer_id', a.answer_id, 'answer_text', a.answer_text, 'is_correct', a.is_correct)) AS answers
+            FROM questions q
+            JOIN answers a ON q.question_id = a.question_id
+            GROUP BY q.question_id
+        `);
+
+        res.render('admin_dashboard', { scores: result.rows, questions: questions.rows });
     } catch (err) {
-        console.error("Error fetching user scores:", err);
-        res.status(500).send('Failed to load user scores');
+        res.status(500).send('Failed to load admin dashboard');
     }
 });
 
-// Admin-only route to add questions and answers
 app.post('/admin/questions', authenticateToken, ensureAdmin, async (req, res) => {
     const { questionText, answers } = req.body;
-
     try {
         const result = await db.query(
             'INSERT INTO questions (question_text) VALUES ($1) RETURNING question_id',
             [questionText]
         );
         const questionId = result.rows[0].question_id;
-
         for (let answer of answers) {
+            await db.query(
+                'INSERT INTO answers (question_id, answer_text, is_correct) VALUES ($1, $2, $3)',
+                [questionId, answer.text, answer.isCorrect === 'on']
+            );
+        }
+        res.redirect('/admin');
+    } catch (err) {
+        res.status(500).send('Failed to add question');
+    }
+});
+
+app.post('/admin/questions/:id/delete', authenticateToken, ensureAdmin, async (req, res) => {
+    const questionId = req.params.id;
+
+    try {
+        // Step 1: Get all answer IDs for this question
+        const answersRes = await db.query(
+            'SELECT answer_id FROM answers WHERE question_id = $1',
+            [questionId]
+        );
+        const answerIds = answersRes.rows.map(row => row.answer_id);
+
+        // Step 2: Delete user_answers referencing those answers
+        if (answerIds.length > 0) {
+            await db.query(
+                'DELETE FROM user_answers WHERE selected_answer = ANY($1)',
+                [answerIds]
+            );
+        }
+
+        // Step 3: Delete answers for this question
+        await db.query('DELETE FROM answers WHERE question_id = $1', [questionId]);
+
+        // Step 4: Delete the question itself
+        await db.query('DELETE FROM questions WHERE question_id = $1', [questionId]);
+
+        res.redirect('/admin');
+    } catch (err) {
+        console.error('Failed to delete question:', err);
+        res.status(500).send('Failed to delete question');
+    }
+});
+
+app.post('/admin/questions/:id/edit', authenticateToken, ensureAdmin, async (req, res) => {
+    const questionId = req.params.id;
+    const { questionText, answers } = req.body;
+
+    try {
+        // Step 1: Fetch all answer_ids for this question
+        const existingAnswers = await db.query(
+            'SELECT answer_id FROM answers WHERE question_id = $1',
+            [questionId]
+        );
+        const answerIds = existingAnswers.rows.map(row => row.answer_id);
+
+        if (answerIds.length > 0) {
+            // Step 2: Delete user_answers that refer to those answers
+            await db.query(
+                'DELETE FROM user_answers WHERE selected_answer = ANY($1)',
+                [answerIds]
+            );
+        }
+
+        // Step 3: Now safe to delete answers
+        await db.query('DELETE FROM answers WHERE question_id = $1', [questionId]);
+
+        // Step 4: Update question text
+        await db.query('UPDATE questions SET question_text = $1 WHERE question_id = $2', [questionText, questionId]);
+
+        // Step 5: Insert new answers
+        for (const key in answers) {
+            const answer = answers[key];
             const answerText = answer.text;
-            const isCorrect = answer.isCorrect === 'on'; 
+            const isCorrect = answer.isCorrect === 'on' || answer.isCorrect === true;
             await db.query(
                 'INSERT INTO answers (question_id, answer_text, is_correct) VALUES ($1, $2, $3)',
                 [questionId, answerText, isCorrect]
             );
         }
-        res.redirect('/admin'); // Redirect back to the admin page
+
+        res.redirect('/admin');
     } catch (err) {
-        console.error("Error adding question:", err);
-        res.status(500).send('Failed to add question');
+        console.error('❌ Failed to update question:', err);
+        res.status(500).send('Failed to update question');
     }
 });
 
-// Handle questionnaire submission and calculate score
-app.post('/submit-answers', authenticateToken, async (req, res) => {
-    const userId = req.user.userId;
-    let answers = req.body.answers;
-
-    // Log the submitted answers for debugging
-    console.log("Original submitted answers:", answers);
-
-    // Transform answers to an object if it arrives as an array
-    if (Array.isArray(answers)) {
-        answers = Object.fromEntries(answers.map((ans, index) => [index + 1, ans]));
-    }
-
-    console.log("Processed answers as object:", answers);
-
-    if (!answers || typeof answers !== 'object' || Object.keys(answers).length === 0) {
-        console.error("Invalid answer submission:", answers);
-        return res.status(400).send('Invalid answer submission');
-    }
-
-    try {
-        const validQuestionIdsResult = await db.query('SELECT question_id FROM questions');
-        const validQuestionIds = validQuestionIdsResult.rows.map(row => row.question_id);
-
-        let score = 0;
-
-        await Promise.all(Object.keys(answers).map(async (questionId) => {
-            const parsedQuestionId = parseInt(questionId, 10);
-
-            if (!validQuestionIds.includes(parsedQuestionId)) {
-                console.error(`Invalid question ID submitted: ${parsedQuestionId}`);
-                throw new Error(`Invalid question ID: ${parsedQuestionId}`);
-            }
-
-            const selectedAnswerId = parseInt(answers[questionId], 10);
-            if (!selectedAnswerId) {
-                console.error(`Answer ID not found for question ${questionId}`);
-                throw new Error(`Answer ID missing for question ${questionId}`);
-            }
-
-            const answerResult = await db.query('SELECT is_correct FROM answers WHERE answer_id = $1', [selectedAnswerId]);
-            if (answerResult.rows.length === 0) {
-                console.error(`Answer with ID ${selectedAnswerId} does not exist in the database`);
-                throw new Error(`Invalid answer ID ${selectedAnswerId}`);
-            }
-
-            const isCorrect = answerResult.rows[0].is_correct;
-            if (isCorrect) score += 1;
-
-            await db.query(
-                'INSERT INTO user_answers (user_id, question_id, selected_answer, is_correct) VALUES ($1, $2, $3, $4)',
-                [userId, parsedQuestionId, selectedAnswerId, isCorrect]
-            );
-        }));
-
-        // Retrieve the user's current highest score from user_scores
-        const existingScore = await db.query('SELECT highest_score FROM user_scores WHERE user_id = $1', [userId]);
-        const existingHighestScore = existingScore.rows[0]?.highest_score || 0;
-
-        // Update the highest score only if the new score is greater
-        if (score > existingHighestScore) {
-            await db.query(`
-                INSERT INTO user_scores (user_id, highest_score)
-                VALUES ($1, $2)
-                ON CONFLICT (user_id)
-                DO UPDATE SET highest_score = $2
-                WHERE user_scores.highest_score < $2;
-            `, [userId, score]);
-        }
-
-        res.redirect('/user-dashboard');
-    } catch (err) {
-        console.error("Error in /submit-answers route:", err);
-        res.status(500).send('Error submitting answers');
-    }
-});
-
-
-// Route to reset quiz for retake
-app.post('/reset-quiz', authenticateToken, async (req, res) => {
-    const userId = req.user.userId;
-
-    try {
-        // Delete previous answers if the user wants to retake the quiz
-        await db.query('DELETE FROM user_answers WHERE user_id = $1', [userId]);
-
-        // Redirect to the quiz-taking route
-        res.redirect('/user-dashboard'); // Ensure /user-dashboard displays the quiz if no answers are found
-    } catch (err) {
-        console.error("Error resetting quiz:", err);
-        res.status(500).send('Failed to reset quiz');
-    }
-});
-
-
-// Logout route
 app.get('/logout', (req, res) => {
     req.session.destroy((err) => {
-        if (err) {
-            console.error("Error destroying session during logout:", err);
-            return res.status(500).send('Logout failed');
-        }
-        res.redirect('/login'); // Redirect to login page after logging out
+        if (err) return res.status(500).send('Logout failed');
+        res.redirect('/login');
     });
 });
 
-// Start the server
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
