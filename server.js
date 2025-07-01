@@ -142,7 +142,7 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
           pubDate: item.pubDate
         }));
       } catch (rssErr) {
-        console.error('⚠️ Failed to fetch RSS feed:', rssErr);
+        console.error('Failed to fetch RSS feed:', rssErr);
       }
 
       // 3d) Render results view
@@ -189,7 +189,7 @@ app.get('/user-dashboard', authenticateToken, async (req, res) => {
         pubDate: item.pubDate
       }));
     } catch (rssErr) {
-      console.error('⚠️ Failed to fetch RSS feed:', rssErr);
+      console.error('Failed to fetch RSS feed:', rssErr);
     }
 
     // 6) Render quiz view
